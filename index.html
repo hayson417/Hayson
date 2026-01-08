@@ -65,24 +65,107 @@
         }
         
         .score-container {
+            display: flex;
+            justify-content: space-between;
             background-color: #333;
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 20px;
-            text-align: center;
             border: 1px solid #444;
         }
         
+        .score-box {
+            text-align: center;
+            flex: 1;
+        }
+        
         .score-title {
-            font-size: 1.2rem;
+            font-size: 1rem;
             color: #aaa;
             margin-bottom: 5px;
         }
         
         .score {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             font-weight: bold;
             color: #4CAF50;
+        }
+        
+        .high-score {
+            color: #FFD700;
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        }
+        
+        .difficulty-container {
+            background-color: #333;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #444;
+        }
+        
+        .difficulty-title {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+        
+        .difficulty-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .difficulty-btn {
+            flex: 1;
+            padding: 8px 5px;
+            background-color: #444;
+            color: #ccc;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+        
+        .difficulty-btn:hover {
+            background-color: #555;
+        }
+        
+        .difficulty-btn.active {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .difficulty-btn.easy.active {
+            background-color: #4CAF50;
+        }
+        
+        .difficulty-btn.medium.active {
+            background-color: #FF9800;
+        }
+        
+        .difficulty-btn.hard.active {
+            background-color: #F44336;
+        }
+        
+        .comment-container {
+            background-color: #333;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #444;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .comment-text {
+            font-size: 1.1rem;
+            color: #fff;
+            font-style: italic;
         }
         
         .controls {
@@ -266,8 +349,27 @@
         
         <div class="game-info">
             <div class="score-container">
-                <div class="score-title">分數</div>
-                <div class="score" id="score">0</div>
+                <div class="score-box">
+                    <div class="score-title">當前分數</div>
+                    <div class="score" id="score">0</div>
+                </div>
+                <div class="score-box">
+                    <div class="score-title">最高分數</div>
+                    <div class="score high-score" id="high-score">0</div>
+                </div>
+            </div>
+            
+            <div class="difficulty-container">
+                <div class="difficulty-title">遊戲難度</div>
+                <div class="difficulty-buttons">
+                    <button class="difficulty-btn easy active" data-difficulty="easy">簡單</button>
+                    <button class="difficulty-btn medium" data-difficulty="medium">中級</button>
+                    <button class="difficulty-btn hard" data-difficulty="hard">困難</button>
+                </div>
+            </div>
+            
+            <div class="comment-container">
+                <div class="comment-text" id="comment">歡迎來到貪食蛇遊戲！選擇難度後開始遊戲吧！</div>
             </div>
             
             <div class="controls">
@@ -307,10 +409,13 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('high-score');
         const gameStatusElement = document.getElementById('gameStatus');
+        const commentElement = document.getElementById('comment');
         const startButton = document.getElementById('start-btn');
         const pauseButton = document.getElementById('pause-btn');
         const restartButton = document.getElementById('restart-btn');
+        const difficultyButtons = document.querySelectorAll('.difficulty-btn');
         
         // 移動控制按鈕
         const upButton = document.getElementById('up-btn');
@@ -334,6 +439,15 @@
         let gamePaused = false;
         let gameLoop;
         
+        // 新增變量：難度設定和最高分數記錄
+        let difficulty = 'easy'; // 預設為簡單
+        let highScore = localStorage.getItem('snakeHighScore') ? parseInt(localStorage.getItem('snakeHighScore')) : 0;
+        let difficultyHighScores = {
+            easy: localStorage.getItem('snakeHighScoreEasy') ? parseInt(localStorage.getItem('snakeHighScoreEasy')) : 0,
+            medium: localStorage.getItem('snakeHighScoreMedium') ? parseInt(localStorage.getItem('snakeHighScoreMedium')) : 0,
+            hard: localStorage.getItem('snakeHighScoreHard') ? parseInt(localStorage.getItem('snakeHighScoreHard')) : 0
+        };
+        
         // 初始化遊戲
         function initGame() {
             // 初始化蛇 - 從中間開始，長度為3
@@ -350,9 +464,26 @@
             direction = 'right';
             nextDirection = 'right';
             score = 0;
-            gameSpeed = 150;
+            
+            // 根據難度設定遊戲速度
+            switch(difficulty) {
+                case 'easy':
+                    gameSpeed = 150;
+                    break;
+                case 'medium':
+                    gameSpeed = 120;
+                    break;
+                case 'hard':
+                    gameSpeed = 90;
+                    break;
+            }
+            
+            // 更新分數顯示
             scoreElement.textContent = score;
-            gameStatusElement.textContent = '準備開始';
+            highScoreElement.textContent = difficultyHighScores[difficulty];
+            
+            // 更新評語
+            updateComment('initial');
             
             // 繪製初始狀態
             draw();
@@ -552,13 +683,21 @@
                 score += 10;
                 scoreElement.textContent = score;
                 
-                // 每得50分增加遊戲速度
-                if (score % 50 === 0 && gameSpeed > 50) {
+                // 每得50分增加遊戲速度（困難模式除外，因為已經很快了）
+                if (difficulty !== 'hard' && score % 50 === 0 && gameSpeed > 50) {
                     gameSpeed -= 10;
+                }
+                
+                // 困難模式每30分增加速度
+                if (difficulty === 'hard' && score % 30 === 0 && gameSpeed > 30) {
+                    gameSpeed -= 5;
                 }
                 
                 // 生成新食物
                 generateFood();
+                
+                // 更新評語
+                updateComment('ateFood');
                 
                 // 更新遊戲狀態顯示
                 gameStatusElement.textContent = `吃到蘋果！長度：${snake.length}`;
@@ -606,9 +745,11 @@
             if (gameRunning && !gamePaused) {
                 gamePaused = true;
                 gameStatusElement.textContent = '遊戲已暫停';
+                updateComment('paused');
             } else if (gamePaused) {
                 gamePaused = false;
                 gameStatusElement.textContent = '遊戲進行中';
+                updateComment('resumed');
             }
         }
         
@@ -622,8 +763,121 @@
         // 遊戲結束
         function gameOver() {
             gameRunning = false;
-            gameStatusElement.textContent = `遊戲結束！最終分數：${score}`;
+            
+            // 檢查是否打破最高分數紀錄
+            let isNewHighScore = false;
+            if (score > difficultyHighScores[difficulty]) {
+                difficultyHighScores[difficulty] = score;
+                isNewHighScore = true;
+                
+                // 儲存到 localStorage
+                localStorage.setItem(`snakeHighScore${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}`, score);
+                
+                // 更新總最高分數
+                highScore = Math.max(score, highScore);
+                localStorage.setItem('snakeHighScore', highScore);
+            }
+            
+            // 更新最高分數顯示
+            highScoreElement.textContent = difficultyHighScores[difficulty];
+            
+            // 更新遊戲狀態顯示
+            let message = `遊戲結束！最終分數：${score}`;
+            if (isNewHighScore) {
+                message += ' - 新紀錄！';
+            }
+            gameStatusElement.textContent = message;
+            
+            // 更新評語
+            updateComment('gameOver', score, isNewHighScore);
+            
             clearInterval(gameLoop);
+        }
+        
+        // 更新評語
+        function updateComment(type, score = 0, isNewHighScore = false) {
+            let comment = '';
+            
+            switch(type) {
+                case 'initial':
+                    comment = '歡迎來到貪食蛇遊戲！選擇難度後開始遊戲吧！';
+                    break;
+                case 'paused':
+                    comment = '遊戲已暫停。深呼吸一下，準備繼續挑戰！';
+                    break;
+                case 'resumed':
+                    comment = '遊戲繼續！集中精神，小心不要撞牆！';
+                    break;
+                case 'ateFood':
+                    const comments = [
+                        '做得好！繼續保持！',
+                        '美味蘋果！蛇越來越長了！',
+                        '分數上升中！加油！',
+                        '幹得好！小心別撞到自己！',
+                        '保持節奏，繼續前進！'
+                    ];
+                    comment = comments[Math.floor(Math.random() * comments.length)];
+                    break;
+                case 'gameOver':
+                    if (isNewHighScore) {
+                        const highScoreComments = [
+                            '太厲害了！打破紀錄！你是貪食蛇大師！',
+                            '恭喜！創造了新紀錄！',
+                            '驚人的表現！你已經超越了自己！',
+                            '新紀錄誕生！你的技術太棒了！'
+                        ];
+                        comment = highScoreComments[Math.floor(Math.random() * highScoreComments.length)];
+                    } else if (score === 0) {
+                        comment = '沒關係，再試一次！這次要小心點喔！';
+                    } else if (score < 50) {
+                        comment = '不錯的開始！再多練習幾次會更好！';
+                    } else if (score < 100) {
+                        comment = '表現不錯！已經掌握了一些技巧！';
+                    } else if (score < 200) {
+                        comment = '很棒的分數！你已經是個貪食蛇高手了！';
+                    } else {
+                        comment = '太強了！這麼高的分數，你可以挑戰更高難度！';
+                    }
+                    break;
+            }
+            
+            commentElement.textContent = comment;
+        }
+        
+        // 設置難度
+        function setDifficulty(selectedDifficulty) {
+            difficulty = selectedDifficulty;
+            
+            // 更新按鈕狀態
+            difficultyButtons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.difficulty === selectedDifficulty) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // 更新最高分數顯示
+            highScoreElement.textContent = difficultyHighScores[difficulty];
+            
+            // 如果遊戲正在進行中，重新開始遊戲
+            if (gameRunning) {
+                restartGame();
+            } else {
+                // 更新評語
+                let difficultyName = '';
+                switch(selectedDifficulty) {
+                    case 'easy':
+                        difficultyName = '簡單';
+                        break;
+                    case 'medium':
+                        difficultyName = '中級';
+                        break;
+                    case 'hard':
+                        difficultyName = '困難';
+                        break;
+                }
+                commentElement.textContent = `已切換到${difficultyName}模式。最高分數：${difficultyHighScores[difficulty]}`;
+            }
         }
         
         // 鍵盤控制
@@ -716,12 +970,22 @@
             pauseButton.addEventListener('click', pauseGame);
             restartButton.addEventListener('click', restartGame);
             
+            // 難度選擇
+            difficultyButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setDifficulty(btn.dataset.difficulty);
+                });
+            });
+            
             // 移動控制
             setupMobileControls();
         }
         
         // 初始化遊戲
         window.onload = function() {
+            // 初始化最高分數顯示
+            highScoreElement.textContent = difficultyHighScores[difficulty];
+            
             initEventListeners();
             initGame();
             draw();
